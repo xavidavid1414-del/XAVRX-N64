@@ -10,6 +10,7 @@ option(XAVRX_BUILD_TESTS "Build host-side unit tests" ON)
 add_library(xavrx_core
     src/cpu.c
     src/bus.c
+    src/cartridge.c
 )
 target_include_directories(xavrx_core PUBLIC include)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
