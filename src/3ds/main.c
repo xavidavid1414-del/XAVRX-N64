@@ -3,6 +3,7 @@
 #include <dirent.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
@@ -155,8 +156,15 @@ static void draw_library(void) {
         printf("Directories can be opened from SD settings.\n");
     }
     printf("\n%s\n", status);
-    printf("\nGame rendering will be connected after the\n");
-    printf("CPU, RSP and graphics hardware are implemented.");
+    if (cartridge.data != NULL) {
+        printf("\nLoaded ROM: %.60s\n", loaded_rom);
+        printf("Normalized format: big-endian z64\n");
+        printf("ROM bytes: %lu\n", (unsigned long)cartridge.size);
+        printf("Game execution is not connected yet.");
+    } else {
+        printf("\nROM selection reads and validates the image.\n");
+        printf("CPU, RSP and RDP execution is still in progress.");
+    }
 
     consoleSelect(&bottom);
     consoleClear();
