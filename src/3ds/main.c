@@ -5,6 +5,9 @@
 #include <string.h>
 #include <strings.h>
 
+static PrintConsole top;
+static PrintConsole bottom;
+
 #define MAX_ITEMS 96
 #define PATH_SIZE 512
 
