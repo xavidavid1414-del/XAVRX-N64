@@ -111,7 +111,7 @@ static void test_cpu_multiply_divide_and_64bit(void) {
     assert(xavrx_bus_write32(&bus, 8u, encode_r(8u, 9u, 0u, 0u, 0x18u))); /* mult */
     assert(xavrx_bus_write32(&bus, 12u, encode_r(8u, 9u, 0u, 0u, 0x1au))); /* div */
     assert(xavrx_bus_write32(&bus, 16u, encode_r(9u, 0u, 10u, 4u, 0x38u))); /* dsll */
-    assert(xavrx_bus_write32(&bus, 20u, 0xdd0c0000u)); /* sd r12,0(r8) */
+    assert(xavrx_bus_write32(&bus, 20u, 0xfd0c0000u)); /* sd r12,0(r8) */
     xavrx_cpu_reset(&cpu, 0u);
     assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
     assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
