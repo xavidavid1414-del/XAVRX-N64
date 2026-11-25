@@ -4,9 +4,9 @@ A from-scratch Nintendo 64 emulator project targeting the New Nintendo 2DS XL.
 
 ## Project status
 
-**Phase 1 — Architecture and MIPS core (in progress).**
+**Current status: early development.**
 
-This repository currently contains an initial MIPS III/R4300i interpreter core, a big-endian RDRAM bus, host-side unit tests, and a minimal 3DS homebrew entry point. It is not yet capable of booting commercial games.
+This repository currently contains an initial MIPS III/R4300i interpreter core, a big-endian RDRAM bus, host-side unit tests, a 3DS dual-screen interface, and an SD browser that reads and validates `.z64`, `.v64`, and `.n64` cartridge images. ROM execution, RSP/RDP graphics, audio, and a tested CIA release are not implemented yet.
 
 ## Build and test on a desktop
 
