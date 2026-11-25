@@ -168,12 +168,52 @@ static void test_cpu_hilo_and_cop0(void) {
     xavrx_bus_destroy(&bus);
 }
 
+
+static void test_cpu_regimm_and_immediate_compare(void) {
+    xavrx_bus_t bus = {0};
+    xavrx_cpu_t cpu;
+    assert(xavrx_bus_init(&bus, 4096u));
+    assert(xavrx_bus_write32(&bus, 0u, 0x2408ffffu)); /* addiu r8,zero,-1 */
+    assert(xavrx_bus_write32(&bus, 4u, 0x29090000u)); /* sltiu r9,r8,0 */
+    assert(xavrx_bus_write32(&bus, 8u, 0x05000002u)); /* bltz r8,+2 */
+    assert(xavrx_bus_write32(&bus, 12u, 0x240a0001u)); /* delay slot */
+    assert(xavrx_bus_write32(&bus, 20u, 0x240a0002u)); /* branch target */
+    xavrx_cpu_reset(&cpu, 0u);
+    for (unsigned i = 0; i < 5u; ++i)
+        assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert(cpu.gpr[9] == 1u); /* unsigned comparison against sign-extended zero */
+    assert(cpu.gpr[10] == 2u);
+    assert(cpu.pc == 24u);
+    xavrx_bus_destroy(&bus);
+}
+
+static void test_cpu_regimm_link_delay_slot(void) {
+    xavrx_bus_t bus = {0};
+    xavrx_cpu_t cpu;
+    assert(xavrx_bus_init(&bus, 4096u));
+    assert(xavrx_bus_write32(&bus, 0u, 0x2408ffffu)); /* addiu r8,zero,-1 */
+    assert(xavrx_bus_write32(&bus, 4u, 0x05100002u)); /* bltzal r8,+2 */
+    assert(xavrx_bus_write32(&bus, 8u, 0x24090007u)); /* delay slot */
+    assert(xavrx_bus_write32(&bus, 16u, 0x240a0009u)); /* target */
+    xavrx_cpu_reset(&cpu, 0u);
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert(cpu.gpr[31] == 12u && cpu.pc == 8u && cpu.next_pc == 16u);
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert(cpu.gpr[9] == 7u);
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert(cpu.gpr[10] == 9u);
+    xavrx_bus_destroy(&bus);
+}
+
 int main(void) {
     test_big_endian_bus();
     test_cartridge_byte_orders();
     test_cpu_multiply_divide_and_64bit();
     test_cpu_unaligned_word_merges();
     test_cpu_hilo_and_cop0();
+    test_cpu_regimm_and_immediate_compare();
+    test_cpu_regimm_link_delay_slot();
     test_cpu_addiu_and_logic();
     test_cpu_branch_delay_slot();
     test_cpu_jump_and_link();
