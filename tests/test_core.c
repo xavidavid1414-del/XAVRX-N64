@@ -56,6 +56,23 @@ static void test_cpu_branch_delay_slot(void) {
     xavrx_bus_destroy(&bus);
 }
 
+
+static void test_cpu_jump_and_link(void) {
+    xavrx_bus_t bus = {0};
+    xavrx_cpu_t cpu;
+    assert(xavrx_bus_init(&bus, 4096u));
+    /* jal 0x10; addiu t0, zero, 3 (delay slot) */
+    assert(xavrx_bus_write32(&bus, 0u, 0x0c000004u));
+    assert(xavrx_bus_write32(&bus, 4u, 0x24080003u));
+    xavrx_cpu_reset(&cpu, 0u);
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert(cpu.gpr[31] == 8u);
+    assert(cpu.pc == 4u && cpu.next_pc == 16u);
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert(cpu.gpr[8] == 3u && cpu.pc == 16u);
+    xavrx_bus_destroy(&bus);
+}
+
 int main(void) {
     test_big_endian_bus();
     test_cpu_addiu_and_logic();
