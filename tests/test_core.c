@@ -1,5 +1,5 @@
 #include "xavrx/bus.h"
-#include "xavrx/cpu.h"
+#include "xavrx/cpu.h"\n#include "xavrx/cartridge.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -73,8 +73,33 @@ static void test_cpu_jump_and_link(void) {
     xavrx_bus_destroy(&bus);
 }
 
-int main(void) {
-    test_big_endian_bus();
+
+static void test_cartridge_byte_orders(void) {
+    const uint8_t z64[] = {0x80u, 0x37u, 0x12u, 0x40u, 0x11u, 0x22u, 0x33u, 0x44u};
+    const uint8_t v64[] = {0x37u, 0x80u, 0x40u, 0x12u, 0x22u, 0x11u, 0x44u, 0x33u};
+    const uint8_t n64[] = {0x40u, 0x12u, 0x37u, 0x80u, 0x44u, 0x33u, 0x22u, 0x11u};
+    xavrx_cartridge_t cart = {0};
+
+    assert(xavrx_cartridge_load_memory(&cart, z64, sizeof(z64)));
+    assert(cart.source_order == XAVRX_ROM_ORDER_Z64);
+    assert(memcmp(cart.data, z64, sizeof(z64)) == 0);
+    xavrx_cartridge_unload(&cart);
+
+    assert(xavrx_cartridge_load_memory(&cart, v64, sizeof(v64)));
+    assert(cart.source_order == XAVRX_ROM_ORDER_V64);
+    assert(memcmp(cart.data, z64, sizeof(z64)) == 0);
+    xavrx_cartridge_unload(&cart);
+
+    assert(xavrx_cartridge_load_memory(&cart, n64, sizeof(n64)));
+    assert(cart.source_order == XAVRX_ROM_ORDER_N64);
+    assert(memcmp(cart.data, z64, sizeof(z64)) == 0);
+    xavrx_cartridge_unload(&cart);
+
+    assert(!xavrx_cartridge_load_memory(&cart, (const uint8_t *)"NOPE", 4u));
+    assert(!xavrx_cartridge_load_memory(&cart, z64, 7u));
+}
+\nint main(void) {
+    test_big_endian_bus();\n    test_cartridge_byte_orders();
     test_cpu_addiu_and_logic();
     test_cpu_branch_delay_slot();
     puts("XAVRX N64 core tests passed.");
