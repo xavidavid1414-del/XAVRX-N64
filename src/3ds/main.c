@@ -177,8 +177,8 @@ static void draw_sd(void) {
 
 int main(void) {
     gfxInitDefault();
-    consoleInit(GFX_TOP, NULL);
-    consoleInit(GFX_BOTTOM, NULL);
+    consoleInit(GFX_TOP, &top);
+    consoleInit(GFX_BOTTOM, &bottom);
 
     while (aptMainLoop()) {
         hidScanInput();
