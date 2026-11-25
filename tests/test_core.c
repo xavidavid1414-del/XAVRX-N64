@@ -45,7 +45,7 @@ static void test_cpu_branch_delay_slot(void) {
     /* beq zero, zero, +2; addiu t0, zero, 1 (delay slot); addiu t0, zero, 2 */
     assert(xavrx_bus_write32(&bus, 0u, 0x10000002u));
     assert(xavrx_bus_write32(&bus, 4u, 0x24080001u));
-    assert(xavrx_bus_write32(&bus, 8u, 0x24080002u));
+    assert(xavrx_bus_write32(&bus, 12u, 0x24080002u));
     xavrx_cpu_reset(&cpu, 0u);
     assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
     assert(cpu.pc == 4u && cpu.next_pc == 12u);
