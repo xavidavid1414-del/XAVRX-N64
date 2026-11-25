@@ -78,6 +78,13 @@ xavrx_cpu_result_t xavrx_cpu_step(xavrx_cpu_t *cpu, xavrx_bus_t *bus) {
             case 0x00: result = (uint32_t)b << shift; result = sign_extend32((uint32_t)result); break;
             case 0x02: result = sign_extend32((uint32_t)b >> shift); break;
             case 0x03: result = sign_extend32((uint32_t)((int32_t)b >> shift)); break;
+            case 0x04: result = (uint32_t)b << (a & 31u); result = sign_extend32((uint32_t)result); break; /* SLLV */
+            case 0x06: result = sign_extend32((uint32_t)b >> (a & 31u)); break; /* SRLV */
+            case 0x07: result = sign_extend32((uint32_t)((int32_t)b >> (a & 31u))); break; /* SRAV */
+            case 0x10: result = cpu->hi; break; /* MFHI */
+            case 0x11: cpu->hi = a; break; /* MTHI */
+            case 0x12: result = cpu->lo; break; /* MFLO */
+            case 0x13: cpu->lo = a; break; /* MTLO */
             case 0x08: cpu->next_pc = a; break; /* JR */
             case 0x09: result = cpu->pc + 4u; cpu->next_pc = a; if (rd != 0u) cpu->gpr[rd] = result; break;
             case 0x14: result = b << (a & 63u); break;
@@ -164,6 +171,34 @@ xavrx_cpu_result_t xavrx_cpu_step(xavrx_cpu_t *cpu, xavrx_bus_t *bus) {
         uint16_t data16;
         uint8_t data8;
         switch (op) {
+            case 0x01: {
+                bool take = false;
+                bool link = false;
+                if (rt == 0u || rt == 16u) take = (int64_t)a < 0;
+                else if (rt == 1u || rt == 17u) take = (int64_t)a >= 0;
+                else return exception(cpu, 10u);
+                link = rt >= 16u;
+                if (link) cpu->gpr[31] = cpu->pc + 4u;
+                if (take) cpu->next_pc = cpu->pc + ((int64_t)immediate * 4);
+                break;
+            }
+            case 0x10: /* COP0 */
+                if (rs == 0u) {
+                    if (rt != 0u) cpu->gpr[rt] = sign_extend32((uint32_t)cpu->cp0[rd]);
+                } else if (rs == 4u) {
+                    if (rd == 12u || rd == 13u || rd == 14u || rd == 8u)
+                        cpu->cp0[rd] = sign_extend32((uint32_t)b);
+                } else if (rs == 16u && FN(instruction) == 0x18u) { /* ERET */
+                    cpu->pc = cpu->cp0[14];
+                    cpu->next_pc = cpu->pc + 4u;
+                    cpu->cp0[12] &= ~(1ull << 1);
+                    cpu->gpr[0] = 0u;
+                    cpu->instructions_executed++;
+                    return XAVRX_CPU_OK;
+                } else {
+                    return exception(cpu, 10u);
+                }
+                break;
             case 0x02: cpu->next_pc = (cpu->pc & 0xfffffffff0000000ull) | ((uint64_t)TARGET(instruction) << 2); break;
             case 0x03: cpu->gpr[31] = cpu->pc + 4u; cpu->next_pc = (cpu->pc & 0xfffffffff0000000ull) | ((uint64_t)TARGET(instruction) << 2); break;
             case 0x04: if (a == b) cpu->next_pc = cpu->pc + ((int64_t)immediate * 4); break;
