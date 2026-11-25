@@ -148,11 +148,32 @@ static void test_cpu_unaligned_word_merges(void) {
     xavrx_bus_destroy(&bus);
 }
 
+
+static void test_cpu_hilo_and_cop0(void) {
+    xavrx_bus_t bus = {0};
+    xavrx_cpu_t cpu;
+    uint32_t mtc0_status = (0x10u << 26) | (4u << 21) | (8u << 16) | (12u << 11);
+    uint32_t mfc0_status = (0x10u << 26) | (0u << 21) | (10u << 16) | (12u << 11);
+    assert(xavrx_bus_init(&bus, 4096u));
+    assert(xavrx_bus_write32(&bus, 0u, 0x24080005u)); /* addiu r8,zero,5 */
+    assert(xavrx_bus_write32(&bus, 4u, encode_r(8u, 0u, 0u, 0u, 0x13u))); /* mtlo r8 */
+    assert(xavrx_bus_write32(&bus, 8u, encode_r(0u, 0u, 9u, 0u, 0x12u))); /* mflo r9 */
+    assert(xavrx_bus_write32(&bus, 12u, mtc0_status));
+    assert(xavrx_bus_write32(&bus, 16u, mfc0_status));
+    xavrx_cpu_reset(&cpu, 0u);
+    for (unsigned i = 0; i < 5u; ++i)
+        assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert(cpu.lo == 5u && cpu.gpr[9] == 5u);
+    assert((uint32_t)cpu.cp0[12] == 5u && cpu.gpr[10] == 5u);
+    xavrx_bus_destroy(&bus);
+}
+
 int main(void) {
     test_big_endian_bus();
     test_cartridge_byte_orders();
     test_cpu_multiply_divide_and_64bit();
     test_cpu_unaligned_word_merges();
+    test_cpu_hilo_and_cop0();
     test_cpu_addiu_and_logic();
     test_cpu_branch_delay_slot();
     test_cpu_jump_and_link();
