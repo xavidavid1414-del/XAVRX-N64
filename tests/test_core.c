@@ -1,8 +1,10 @@
 #include "xavrx/bus.h"
-#include "xavrx/cpu.h"\n#include "xavrx/cartridge.h"
+#include "xavrx/cpu.h"
+#include "xavrx/cartridge.h"
 
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 static void test_big_endian_bus(void) {
     xavrx_bus_t bus = {0};
@@ -23,7 +25,6 @@ static void test_cpu_addiu_and_logic(void) {
     xavrx_bus_t bus = {0};
     xavrx_cpu_t cpu;
     assert(xavrx_bus_init(&bus, 4096u));
-    /* addiu t0, zero, 7; ori t1, t0, 0x120; addu t2, t0, t1 */
     assert(xavrx_bus_write32(&bus, 0u, 0x24080007u));
     assert(xavrx_bus_write32(&bus, 4u, 0x35090120u));
     assert(xavrx_bus_write32(&bus, 8u, 0x01095021u));
@@ -42,7 +43,6 @@ static void test_cpu_branch_delay_slot(void) {
     xavrx_bus_t bus = {0};
     xavrx_cpu_t cpu;
     assert(xavrx_bus_init(&bus, 4096u));
-    /* beq zero, zero, +2; addiu t0, zero, 1 (delay slot); addiu t0, zero, 2 */
     assert(xavrx_bus_write32(&bus, 0u, 0x10000002u));
     assert(xavrx_bus_write32(&bus, 4u, 0x24080001u));
     assert(xavrx_bus_write32(&bus, 12u, 0x24080002u));
@@ -56,12 +56,10 @@ static void test_cpu_branch_delay_slot(void) {
     xavrx_bus_destroy(&bus);
 }
 
-
 static void test_cpu_jump_and_link(void) {
     xavrx_bus_t bus = {0};
     xavrx_cpu_t cpu;
     assert(xavrx_bus_init(&bus, 4096u));
-    /* jal 0x10; addiu t0, zero, 3 (delay slot) */
     assert(xavrx_bus_write32(&bus, 0u, 0x0c000004u));
     assert(xavrx_bus_write32(&bus, 4u, 0x24080003u));
     xavrx_cpu_reset(&cpu, 0u);
@@ -72,7 +70,6 @@ static void test_cpu_jump_and_link(void) {
     assert(cpu.gpr[8] == 3u && cpu.pc == 16u);
     xavrx_bus_destroy(&bus);
 }
-
 
 static void test_cartridge_byte_orders(void) {
     const uint8_t z64[] = {0x80u, 0x37u, 0x12u, 0x40u, 0x11u, 0x22u, 0x33u, 0x44u};
@@ -98,10 +95,13 @@ static void test_cartridge_byte_orders(void) {
     assert(!xavrx_cartridge_load_memory(&cart, (const uint8_t *)"NOPE", 4u));
     assert(!xavrx_cartridge_load_memory(&cart, z64, 7u));
 }
-\nint main(void) {
-    test_big_endian_bus();\n    test_cartridge_byte_orders();
+
+int main(void) {
+    test_big_endian_bus();
+    test_cartridge_byte_orders();
     test_cpu_addiu_and_logic();
     test_cpu_branch_delay_slot();
+    test_cpu_jump_and_link();
     puts("XAVRX N64 core tests passed.");
     return 0;
 }
