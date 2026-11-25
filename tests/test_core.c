@@ -129,10 +129,30 @@ static void test_cpu_multiply_divide_and_64bit(void) {
     xavrx_bus_destroy(&bus);
 }
 
+
+static void test_cpu_unaligned_word_merges(void) {
+    xavrx_bus_t bus = {0};
+    xavrx_cpu_t cpu;
+    assert(xavrx_bus_init(&bus, 4096u));
+    assert(xavrx_bus_write32(&bus, 0x100u, 0x11223344u));
+    assert(xavrx_bus_write32(&bus, 0u, 0x89090001u)); /* lwl r9,1(r8) */
+    assert(xavrx_bus_write32(&bus, 4u, 0x99090002u)); /* lwr r9,2(r8) */
+    xavrx_cpu_reset(&cpu, 0u);
+    cpu.gpr[8] = 0x100u;
+    cpu.gpr[9] = 0xaabbccddu;
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert((uint32_t)cpu.gpr[9] == 0x223344ddu);
+    cpu.gpr[9] = 0xaabbccddu;
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert((uint32_t)cpu.gpr[9] == 0xaa112233u);
+    xavrx_bus_destroy(&bus);
+}
+
 int main(void) {
     test_big_endian_bus();
     test_cartridge_byte_orders();
     test_cpu_multiply_divide_and_64bit();
+    test_cpu_unaligned_word_merges();
     test_cpu_addiu_and_logic();
     test_cpu_branch_delay_slot();
     test_cpu_jump_and_link();
