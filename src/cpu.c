@@ -17,7 +17,7 @@ static uint64_t sign_extend32(uint32_t value) {
 
 static bool translate_address(uint64_t virtual_address, uint32_t *physical) {
     uint32_t address = (uint32_t)virtual_address;
-    if (virtual_address > UINT32_MAX) return false;
+    if ((virtual_address >> 32) != 0u && (virtual_address >> 32) != 0xffffffffu) return false;
     if (address < 0x20000000u) {
         *physical = address;
         return true;
@@ -82,8 +82,20 @@ xavrx_cpu_result_t xavrx_cpu_step(xavrx_cpu_t *cpu, xavrx_bus_t *bus) {
             case 0x09: result = cpu->pc; cpu->next_pc = a; if (rd != 0u) cpu->gpr[rd] = result; break;
             case 0x0c: return exception(cpu, 8u); /* SYSCALL */
             case 0x0d: return exception(cpu, 9u); /* BREAK */
-            case 0x20: case 0x21: result = sign_extend32((uint32_t)((uint32_t)a + (uint32_t)b)); break;
-            case 0x22: case 0x23: result = sign_extend32((uint32_t)((uint32_t)a - (uint32_t)b)); break;
+            case 0x20: {
+                int64_t sum = (int64_t)(int32_t)a + (int64_t)(int32_t)b;
+                if (sum > INT32_MAX || sum < INT32_MIN) return exception(cpu, 12u);
+                result = sign_extend32((uint32_t)sum);
+                break;
+            }
+            case 0x21: result = sign_extend32((uint32_t)((uint32_t)a + (uint32_t)b)); break;
+            case 0x22: {
+                int64_t difference = (int64_t)(int32_t)a - (int64_t)(int32_t)b;
+                if (difference > INT32_MAX || difference < INT32_MIN) return exception(cpu, 12u);
+                result = sign_extend32((uint32_t)difference);
+                break;
+            }
+            case 0x23: result = sign_extend32((uint32_t)((uint32_t)a - (uint32_t)b)); break;
             case 0x24: result = a & b; break;
             case 0x25: result = a | b; break;
             case 0x26: result = a ^ b; break;
@@ -100,12 +112,19 @@ xavrx_cpu_result_t xavrx_cpu_step(xavrx_cpu_t *cpu, xavrx_bus_t *bus) {
         uint8_t data8;
         switch (op) {
             case 0x02: cpu->next_pc = (cpu->pc & 0xfffffffff0000000ull) | ((uint64_t)TARGET(instruction) << 2); break;
-            case 0x03: cpu->gpr[31] = cpu->pc; cpu->next_pc = (cpu->pc & 0xfffffffff0000000ull) | ((uint64_t)TARGET(instruction) << 2); break;
+            case 0x03: cpu->gpr[31] = cpu->pc + 4u; cpu->next_pc = (cpu->pc & 0xfffffffff0000000ull) | ((uint64_t)TARGET(instruction) << 2); break;
             case 0x04: if (a == b) cpu->next_pc = cpu->pc + ((int64_t)immediate * 4); break;
             case 0x05: if (a != b) cpu->next_pc = cpu->pc + ((int64_t)immediate * 4); break;
             case 0x06: if ((int64_t)a <= 0) cpu->next_pc = cpu->pc + ((int64_t)immediate * 4); break;
             case 0x07: if ((int64_t)a > 0) cpu->next_pc = cpu->pc + ((int64_t)immediate * 4); break;
-            case 0x08: case 0x09: result = sign_extend32((uint32_t)((uint32_t)a + (uint32_t)immediate)); if (rt) cpu->gpr[rt] = result; break;
+            case 0x08: {
+                int64_t sum = (int64_t)(int32_t)a + (int64_t)immediate;
+                if (sum > INT32_MAX || sum < INT32_MIN) return exception(cpu, 12u);
+                result = sign_extend32((uint32_t)sum);
+                if (rt) cpu->gpr[rt] = result;
+                break;
+            }
+            case 0x09: result = sign_extend32((uint32_t)((uint32_t)a + (uint32_t)immediate)); if (rt) cpu->gpr[rt] = result; break;
             case 0x0a: if (rt) cpu->gpr[rt] = signed_a < (int64_t)immediate; break;
             case 0x0b: if (rt) cpu->gpr[rt] = a < (uint64_t)(int64_t)immediate; break;
             case 0x0c: if (rt) cpu->gpr[rt] = a & IMM(instruction); break;
