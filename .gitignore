@@ -1,0 +1,7 @@
+/build/
+/dist/
+/*.3dsx
+/*.elf
+/*.cia
+/*.smdh
+/*.3ds

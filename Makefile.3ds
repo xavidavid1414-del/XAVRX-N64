@@ -1,0 +1,30 @@
+# Initial Nintendo 3DS homebrew build (devkitPro/devkitARM).
+ifeq ($(DEVKITPRO),)
+$(error DEVKITPRO is not set. Install devkitPro and the 3DS development tools.)
+endif
+include $(DEVKITPRO)/libctru/3ds_rules
+
+TARGET := xavrx-n64
+BUILD := build-3ds
+SOURCES := src src/3ds
+INCLUDES := include
+CFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+OFILES := $(CFILES:.c=.o)
+VPATH := $(SOURCES)
+ARCH := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
+CFLAGS := -g -Wall -Wextra -O2 -mword-relocations -ffunction-sections $(ARCH) $(INCLUDE) -D__3DS__
+CFLAGS += $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir))
+LDFLAGS := -specs=3dsx.specs -g $(ARCH) -Wl,--gc-sections
+LIBS := -lctru
+
+.PHONY: all clean
+all: $(TARGET).3dsx
+
+$(TARGET).elf: $(OFILES)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+clean:
+	rm -f $(OFILES) $(TARGET).elf $(TARGET).3dsx
