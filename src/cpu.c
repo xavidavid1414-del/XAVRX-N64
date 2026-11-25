@@ -194,10 +194,44 @@ xavrx_cpu_result_t xavrx_cpu_step(xavrx_cpu_t *cpu, xavrx_bus_t *bus) {
             case 0x0e: if (rt) cpu->gpr[rt] = a ^ IMM(instruction); break;
             case 0x0f: if (rt) cpu->gpr[rt] = (uint64_t)(int64_t)(int32_t)((uint32_t)IMM(instruction) << 16); break;
             case 0x20: case 0x24: case 0x21: case 0x25: case 0x23: case 0x27:
+            case 0x22: case 0x26: case 0x2a: case 0x2e:
             case 0x28: case 0x29: case 0x2b: case 0x37: case 0x3f: {
                 address = a + (int64_t)immediate;
                 if (!translate_address(address, &physical)) return XAVRX_CPU_BUS_ERROR;
-                if (op == 0x20 || op == 0x24) {
+                if (op == 0x22 || op == 0x26) {
+                    uint32_t aligned, memory_word, old_word = (uint32_t)b;
+                    unsigned offset = physical & 3u;
+                    if (!xavrx_bus_read32(bus, physical & ~3u, &memory_word))
+                        return XAVRX_CPU_BUS_ERROR;
+                    if (op == 0x22) {
+                        unsigned shift = offset * 8u;
+                        uint32_t preserve = shift == 0u ? 0u : ((1u << shift) - 1u);
+                        result = (uint32_t)((memory_word << shift) | (old_word & preserve));
+                    } else {
+                        unsigned shift = (3u - offset) * 8u;
+                        uint32_t preserve = shift == 0u ? 0u : (0xffffffffu << (32u - shift));
+                        result = (uint32_t)((memory_word >> shift) | (old_word & preserve));
+                    }
+                    if (rt) cpu->gpr[rt] = sign_extend32((uint32_t)result);
+                } else if (op == 0x2a || op == 0x2e) {
+                    uint32_t aligned, memory_word, source = (uint32_t)b;
+                    unsigned offset = physical & 3u;
+                    if (!xavrx_bus_read32(bus, physical & ~3u, &memory_word))
+                        return XAVRX_CPU_BUS_ERROR;
+                    if (op == 0x2a) {
+                        unsigned shift = offset * 8u;
+                        uint32_t mask = shift == 0u ? 0xffffffffu : (0xffffffffu >> shift);
+                        uint32_t merged = (memory_word & ~mask) | ((source >> shift) & mask);
+                        aligned = merged;
+                    } else {
+                        unsigned shift = (3u - offset) * 8u;
+                        uint32_t mask = shift == 0u ? 0xffffffffu : (0xffffffffu << shift);
+                        uint32_t merged = (memory_word & ~mask) | ((source << shift) & mask);
+                        aligned = merged;
+                    }
+                    if (!xavrx_bus_write32(bus, physical & ~3u, aligned))
+                        return XAVRX_CPU_BUS_ERROR;
+                } else if (op == 0x20 || op == 0x24) {
                     if (!xavrx_bus_read8(bus, physical, &data8)) return XAVRX_CPU_BUS_ERROR;
                     if (rt) cpu->gpr[rt] = op == 0x20 ? sign_extend32((uint32_t)(int32_t)(int8_t)data8) : data8;
                 } else if (op == 0x21 || op == 0x25) {
