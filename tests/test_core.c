@@ -96,9 +96,43 @@ static void test_cartridge_byte_orders(void) {
     assert(!xavrx_cartridge_load_memory(&cart, z64, 7u));
 }
 
+
+static uint32_t encode_r(unsigned rs, unsigned rt, unsigned rd, unsigned shift, unsigned function) {
+    return (rs << 21) | (rt << 16) | (rd << 11) | (shift << 6) | function;
+}
+
+static void test_cpu_multiply_divide_and_64bit(void) {
+    xavrx_bus_t bus = {0};
+    xavrx_cpu_t cpu;
+    uint64_t stored = 0u;
+    assert(xavrx_bus_init(&bus, 4096u));
+    assert(xavrx_bus_write32(&bus, 0u, 0x2408ffebu)); /* addiu r8,zero,-21 */
+    assert(xavrx_bus_write32(&bus, 4u, 0x24090004u)); /* addiu r9,zero,4 */
+    assert(xavrx_bus_write32(&bus, 8u, encode_r(8u, 9u, 0u, 0u, 0x18u))); /* mult */
+    assert(xavrx_bus_write32(&bus, 12u, encode_r(8u, 9u, 0u, 0u, 0x1au))); /* div */
+    assert(xavrx_bus_write32(&bus, 16u, encode_r(9u, 0u, 10u, 4u, 0x38u))); /* dsll */
+    assert(xavrx_bus_write32(&bus, 20u, 0xdd0c0000u)); /* sd r12,0(r8) */
+    xavrx_cpu_reset(&cpu, 0u);
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert((int64_t)cpu.lo == -84 && cpu.hi == 0u);
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert((int64_t)cpu.lo == -5 && (int64_t)cpu.hi == -1);
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert(cpu.gpr[10] == 64u);
+    cpu.gpr[8] = 32u;
+    cpu.gpr[12] = 0x1122334455667788ull;
+    assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
+    assert(xavrx_bus_read64(&bus, 32u, &stored));
+    assert(stored == 0x1122334455667788ull);
+    xavrx_bus_destroy(&bus);
+}
+
 int main(void) {
     test_big_endian_bus();
     test_cartridge_byte_orders();
+    test_cpu_multiply_divide_and_64bit();
     test_cpu_addiu_and_logic();
     test_cpu_branch_delay_slot();
     test_cpu_jump_and_link();
