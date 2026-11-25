@@ -1,4 +1,5 @@
 #include <3ds.h>
+#include "xavrx/cartridge.h"
 #include <dirent.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -31,6 +32,8 @@ static int scroll = 0;
 static bool show_fps = true;
 static bool folder_loaded = false;
 static char status[96] = "Choose Settings > SD to select your games folder.";
+static xavrx_cartridge_t cartridge = {0};
+static char loaded_rom[256] = "";
 
 static bool is_rom(const char *name) {
     const char *dot = strrchr(name, '.');
@@ -86,7 +89,46 @@ static void enter_selected(void) {
                 sizeof(game_folder) - strlen(game_folder) - 1);
         load_folder();
     } else {
-        snprintf(status, sizeof(status), "Selected ROM: %.65s", items[selected].name);
+        char path[PATH_SIZE + 256];
+        FILE *file;
+        long file_size;
+        uint8_t *image;
+        size_t bytes_read;
+
+        if (snprintf(path, sizeof(path), "%s/%s", game_folder,
+                     items[selected].name) >= (int)sizeof(path)) {
+            snprintf(status, sizeof(status), "ROM path is too long");
+            return;
+        }
+        file = fopen(path, "rb");
+        if (!file) {
+            snprintf(status, sizeof(status), "Cannot open selected ROM");
+            return;
+        }
+        if (fseek(file, 0, SEEK_END) != 0 || (file_size = ftell(file)) < 4 ||
+            (unsigned long)file_size > XAVRX_ROM_MAX_SIZE ||
+            fseek(file, 0, SEEK_SET) != 0) {
+            fclose(file);
+            snprintf(status, sizeof(status), "Invalid ROM file size");
+            return;
+        }
+        image = (uint8_t *)malloc((size_t)file_size);
+        if (!image) {
+            fclose(file);
+            snprintf(status, sizeof(status), "Not enough memory for ROM");
+            return;
+        }
+        bytes_read = fread(image, 1u, (size_t)file_size, file);
+        fclose(file);
+        if (bytes_read != (size_t)file_size ||
+            !xavrx_cartridge_load_memory(&cartridge, image, bytes_read)) {
+            free(image);
+            snprintf(status, sizeof(status), "Unsupported or damaged N64 ROM");
+            return;
+        }
+        free(image);
+        snprintf(loaded_rom, sizeof(loaded_rom), "%.255s", items[selected].name);
+        snprintf(status, sizeof(status), "ROM validated: %.65s", loaded_rom);
     }
 }
 
@@ -247,6 +289,7 @@ int main(void) {
         gspWaitForVBlank();
     }
 
+    xavrx_cartridge_unload(&cartridge);
     gfxExit();
     return 0;
 }
