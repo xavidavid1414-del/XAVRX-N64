@@ -116,7 +116,7 @@ static void test_cpu_multiply_divide_and_64bit(void) {
     assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
     assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
     assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
-    assert((int64_t)cpu.lo == -84 && cpu.hi == 0u);
+    assert((int64_t)cpu.lo == -84 && (int64_t)cpu.hi == -1);
     assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
     assert((int64_t)cpu.lo == -5 && (int64_t)cpu.hi == -1);
     assert(xavrx_cpu_step(&cpu, &bus) == XAVRX_CPU_OK);
