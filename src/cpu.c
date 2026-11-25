@@ -80,6 +80,59 @@ xavrx_cpu_result_t xavrx_cpu_step(xavrx_cpu_t *cpu, xavrx_bus_t *bus) {
             case 0x03: result = sign_extend32((uint32_t)((int32_t)b >> shift)); break;
             case 0x08: cpu->next_pc = a; break; /* JR */
             case 0x09: result = cpu->pc + 4u; cpu->next_pc = a; if (rd != 0u) cpu->gpr[rd] = result; break;
+            case 0x14: result = b << (a & 63u); break;
+            case 0x16: result = b >> (a & 63u); break;
+            case 0x17: result = (uint64_t)((int64_t)b >> (a & 63u)); break;
+            case 0x18: {
+                int64_t product = (int64_t)(int32_t)a * (int64_t)(int32_t)b;
+                cpu->lo = sign_extend32((uint32_t)product);
+                cpu->hi = sign_extend32((uint32_t)((uint64_t)product >> 32));
+                break;
+            }
+            case 0x19: {
+                uint64_t product = (uint64_t)(uint32_t)a * (uint64_t)(uint32_t)b;
+                cpu->lo = sign_extend32((uint32_t)product);
+                cpu->hi = sign_extend32((uint32_t)(product >> 32));
+                break;
+            }
+            case 0x1a:
+                if ((uint32_t)b != 0u) {
+                    int32_t dividend = (int32_t)a, divisor = (int32_t)b;
+                    if (dividend == INT32_MIN && divisor == -1) {
+                        cpu->lo = sign_extend32((uint32_t)INT32_MIN);
+                        cpu->hi = 0u;
+                    } else {
+                        cpu->lo = sign_extend32((uint32_t)(dividend / divisor));
+                        cpu->hi = sign_extend32((uint32_t)(dividend % divisor));
+                    }
+                }
+                break;
+            case 0x1b:
+                if ((uint32_t)b != 0u) {
+                    cpu->lo = sign_extend32((uint32_t)a / (uint32_t)b);
+                    cpu->hi = sign_extend32((uint32_t)a % (uint32_t)b);
+                }
+                break;
+            case 0x2c: {
+                uint64_t sum;
+                if (__builtin_add_overflow(a, b, &sum)) return exception(cpu, 12u);
+                result = sum;
+                break;
+            }
+            case 0x2d: result = a + b; break;
+            case 0x2e: {
+                uint64_t difference;
+                if (__builtin_sub_overflow(a, b, &difference)) return exception(cpu, 12u);
+                result = difference;
+                break;
+            }
+            case 0x2f: result = a - b; break;
+            case 0x38: result = b << shift; break;
+            case 0x3a: result = b >> shift; break;
+            case 0x3b: result = (uint64_t)((int64_t)b >> shift); break;
+            case 0x3c: result = b << (shift + 32u); break;
+            case 0x3e: result = b >> (shift + 32u); break;
+            case 0x3f: result = (uint64_t)((int64_t)b >> (shift + 32u)); break;
             case 0x0c: return exception(cpu, 8u); /* SYSCALL */
             case 0x0d: return exception(cpu, 9u); /* BREAK */
             case 0x20: {
@@ -117,6 +170,15 @@ xavrx_cpu_result_t xavrx_cpu_step(xavrx_cpu_t *cpu, xavrx_bus_t *bus) {
             case 0x05: if (a != b) cpu->next_pc = cpu->pc + ((int64_t)immediate * 4); break;
             case 0x06: if ((int64_t)a <= 0) cpu->next_pc = cpu->pc + ((int64_t)immediate * 4); break;
             case 0x07: if ((int64_t)a > 0) cpu->next_pc = cpu->pc + ((int64_t)immediate * 4); break;
+            case 0x18: {
+                int64_t sum;
+                if (__builtin_add_overflow((int64_t)a, (int64_t)immediate, &sum))
+                    return exception(cpu, 12u);
+                result = (uint64_t)sum;
+                if (rt) cpu->gpr[rt] = result;
+                break;
+            }
+            case 0x19: result = a + (int64_t)immediate; if (rt) cpu->gpr[rt] = result; break;
             case 0x08: {
                 int64_t sum = (int64_t)(int32_t)a + (int64_t)immediate;
                 if (sum > INT32_MAX || sum < INT32_MIN) return exception(cpu, 12u);
@@ -131,8 +193,8 @@ xavrx_cpu_result_t xavrx_cpu_step(xavrx_cpu_t *cpu, xavrx_bus_t *bus) {
             case 0x0d: if (rt) cpu->gpr[rt] = a | IMM(instruction); break;
             case 0x0e: if (rt) cpu->gpr[rt] = a ^ IMM(instruction); break;
             case 0x0f: if (rt) cpu->gpr[rt] = (uint64_t)(int64_t)(int32_t)((uint32_t)IMM(instruction) << 16); break;
-            case 0x20: case 0x24: case 0x21: case 0x25: case 0x23:
-            case 0x28: case 0x29: case 0x2b: {
+            case 0x20: case 0x24: case 0x21: case 0x25: case 0x23: case 0x27:
+            case 0x28: case 0x29: case 0x2b: case 0x37: case 0x3f: {
                 address = a + (int64_t)immediate;
                 if (!translate_address(address, &physical)) return XAVRX_CPU_BUS_ERROR;
                 if (op == 0x20 || op == 0x24) {
@@ -141,9 +203,15 @@ xavrx_cpu_result_t xavrx_cpu_step(xavrx_cpu_t *cpu, xavrx_bus_t *bus) {
                 } else if (op == 0x21 || op == 0x25) {
                     if (!xavrx_bus_read16(bus, physical, &data16)) return XAVRX_CPU_BUS_ERROR;
                     if (rt) cpu->gpr[rt] = op == 0x21 ? sign_extend32((uint32_t)(int32_t)(int16_t)data16) : data16;
-                } else if (op == 0x23) {
+                } else if (op == 0x23 || op == 0x27) {
                     if (!xavrx_bus_read32(bus, physical, &data32)) return XAVRX_CPU_BUS_ERROR;
-                    if (rt) cpu->gpr[rt] = sign_extend32(data32);
+                    if (rt) cpu->gpr[rt] = op == 0x23 ? sign_extend32(data32) : data32;
+                } else if (op == 0x37) {
+                    uint64_t data64;
+                    if (!xavrx_bus_read64(bus, physical, &data64)) return XAVRX_CPU_BUS_ERROR;
+                    if (rt) cpu->gpr[rt] = data64;
+                } else if (op == 0x3f) {
+                    if (!xavrx_bus_write64(bus, physical, b)) return XAVRX_CPU_BUS_ERROR;
                 } else if (op == 0x28) {
                     if (!xavrx_bus_write8(bus, physical, (uint8_t)b)) return XAVRX_CPU_BUS_ERROR;
                 } else if (op == 0x29) {
