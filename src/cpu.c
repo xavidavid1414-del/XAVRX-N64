@@ -79,7 +79,7 @@ xavrx_cpu_result_t xavrx_cpu_step(xavrx_cpu_t *cpu, xavrx_bus_t *bus) {
             case 0x02: result = sign_extend32((uint32_t)b >> shift); break;
             case 0x03: result = sign_extend32((uint32_t)((int32_t)b >> shift)); break;
             case 0x08: cpu->next_pc = a; break; /* JR */
-            case 0x09: result = cpu->pc; cpu->next_pc = a; if (rd != 0u) cpu->gpr[rd] = result; break;
+            case 0x09: result = cpu->pc + 4u; cpu->next_pc = a; if (rd != 0u) cpu->gpr[rd] = result; break;
             case 0x0c: return exception(cpu, 8u); /* SYSCALL */
             case 0x0d: return exception(cpu, 9u); /* BREAK */
             case 0x20: {
